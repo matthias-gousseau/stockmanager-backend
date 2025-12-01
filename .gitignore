@@ -4,6 +4,12 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+# Logs
+*.log
+
+# Configuration locale (ne JAMAIS commit)
+application-local.properties
+
 ### STS ###
 .apt_generated
 .classpath
@@ -31,3 +37,11 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Maven
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
