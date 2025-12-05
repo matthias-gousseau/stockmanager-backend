@@ -108,7 +108,7 @@ jobs:
             SERVICE="${{ github.ref == 'refs/heads/main' && 'backend-prod' || 'backend-dev' }}"
             echo "🚀 Déploiement backend sur ${{ env.ENVIRONMENT }} avec $COMPOSE_FILE - $(date)"
             docker compose -f $COMPOSE_FILE pull $SERVICE
-            docker compose -f $COMPOSE_FILE up -d --no-deps $SERVICE
+            docker compose -f $COMPOSE_FILE up -d $SERVICE
             echo "✅ Déploiement terminé"
             docker ps --filter "name=stockmanager" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
