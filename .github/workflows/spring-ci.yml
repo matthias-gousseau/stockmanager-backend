@@ -43,7 +43,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Run tests
-        run: mvn -B test -Dspring.profiles.active=ci -X
+        run: mvn -B test -Dspring.profiles.active=ci
 
       - name: Upload test results on failure
         if: failure()
@@ -114,10 +114,8 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd stockmanager
-            # Attendre que le conteneur soit complètement démarré
             sleep 10
-
-            # Vérifier que le conteneur tourne
+            
             if ! docker compose -f docker-compose.prod.yml ps backend-prod | grep -q "Up"; then
               echo "❌ ERREUR: Le conteneur backend-prod n'est pas en cours d'exécution"
               docker compose -f docker-compose.prod.yml logs --tail=50 backend-prod
