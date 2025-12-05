@@ -1,27 +1,145 @@
-name: Spring Boot CI
+name: Spring Boot CI/CD
 
 on:
   push:
-    branches: ["dev", "main"]
+    branches: ["main"]
   pull_request:
-    branches: ["dev", "main"]
+    branches: ["main"]
 
 jobs:
-  build:
+  # Job de tests - s'exécute sur les PR ET les push
+  test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: stockmanager_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup JDK
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          distribution: "temurin"
+          java-version: "17"
 
-      - name: Build with Maven
-        run: mvn -B clean install
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Run tests
-        run: mvn test
+        run: mvn -B test -Dspring.profiles.active=ci -X
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: target/surefire-reports/
+
+  # Job de build et déploiement - s'exécute UNIQUEMENT sur push vers main (après merge)
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Build Spring Boot fat-jar
+        run: mvn -B clean package -DskipTests
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ghcr.io/matthias-gousseau/stockmanager-backend:latest \
+            -t ghcr.io/matthias-gousseau/stockmanager-backend:${{ github.sha }} \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push ghcr.io/matthias-gousseau/stockmanager-backend:latest
+          docker push ghcr.io/matthias-gousseau/stockmanager-backend:${{ github.sha }}
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ubuntu
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd stockmanager
+            echo "🚀 Déploiement backend production - $(date)"
+            docker compose -f docker-compose.prod.yml pull backend-prod
+            docker compose -f docker-compose.prod.yml up -d --no-deps backend-prod
+            echo "✅ Déploiement terminé"
+            docker ps --filter "name=stockmanager" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ubuntu
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd stockmanager
+            # Attendre que le conteneur soit complètement démarré
+            sleep 10
+
+            # Vérifier que le conteneur tourne
+            if ! docker compose -f docker-compose.prod.yml ps backend-prod | grep -q "Up"; then
+              echo "❌ ERREUR: Le conteneur backend-prod n'est pas en cours d'exécution"
+              docker compose -f docker-compose.prod.yml logs --tail=50 backend-prod
+              exit 1
+            fi
+
+            echo "✅ Backend production en cours d'exécution"
+            docker compose -f docker-compose.prod.yml ps backend-prod
+
+      - name: Deployment summary
+        run: |
+          echo "### 🚀 Déploiement backend production réussi" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branche**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Docker**: ghcr.io/matthias-gousseau/stockmanager-backend:latest" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+      - name: Deployment failed
+        if: failure()
+        run: |
+          echo "### ❌ Échec du déploiement backend" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Le déploiement en production a échoué." >> $GITHUB_STEP_SUMMARY
+          echo "Consultez les logs pour plus de détails." >> $GITHUB_STEP_SUMMARY
