@@ -46,4 +46,5 @@ Thumbs.db
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
 
-/resources/application.properties
+# Spring Boot properties
+/src/main/resources/application.properties
