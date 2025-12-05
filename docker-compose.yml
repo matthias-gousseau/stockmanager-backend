@@ -1,0 +1,22 @@
+services:  
+  db-dev:
+    image: postgres:16
+    container_name: postgres-stockmanager-dev
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER_DEV:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_DEV:-postgres}
+      POSTGRES_DB: stockmanager_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER_DEV:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata-dev:
+    driver: local
