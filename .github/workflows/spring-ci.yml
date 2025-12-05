@@ -101,9 +101,23 @@ jobs:
           script: |
             cd stockmanager
             echo "🚀 Déploiement backend production - $(date)"
+
+            # Vérifier que le fichier .env existe
+            if [ ! -f .env ]; then
+              echo "❌ ERREUR: Fichier .env introuvable!"
+              echo "Créez le fichier .env avec:"
+              echo "DB_USER_PROD=votre_user"
+              echo "DB_PASSWORD_PROD=votre_password"
+              echo "JWT_SECRET_PROD=votre_secret"
+              exit 1
+            fi
+
+            # Pull et redémarrage
             docker compose -f docker-compose.prod.yml pull backend-prod
-            docker compose -f docker-compose.prod.yml up -d --no-deps backend-prod
-            echo "✅ Déploiement terminé"
+            docker compose -f docker-compose.prod.yml up -d backend-prod
+
+            echo "✅ Déploiement lancé"
+            echo "📋 Statut des conteneurs:"
             docker ps --filter "name=stockmanager" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
       - name: Verify deployment
@@ -114,16 +128,27 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd stockmanager
-            sleep 10
-            
-            if ! docker compose -f docker-compose.prod.yml ps backend-prod | grep -q "Up"; then
-              echo "❌ ERREUR: Le conteneur backend-prod n'est pas en cours d'exécution"
-              docker compose -f docker-compose.prod.yml logs --tail=50 backend-prod
+            echo "⏳ Attente du démarrage du conteneur (15 secondes)..."
+            sleep 15
+
+            echo "📋 Statut actuel:"
+            docker compose -f docker-compose.prod.yml ps
+
+            echo ""
+            echo "📄 Derniers logs du backend:"
+            docker compose -f docker-compose.prod.yml logs --tail=100 backend-prod
+
+            echo ""
+            # Vérifier le conteneur par son nom
+            if ! docker ps --filter "name=stockmanager-backend-prod" --filter "status=running" | grep -q "stockmanager-backend-prod"; then
+              echo "❌ ERREUR: Le conteneur stockmanager-backend-prod n'est pas en cours d'exécution"
+              echo ""
+              echo "🔍 Logs complets:"
+              docker compose -f docker-compose.prod.yml logs backend-prod
               exit 1
             fi
 
             echo "✅ Backend production en cours d'exécution"
-            docker compose -f docker-compose.prod.yml ps backend-prod
 
       - name: Deployment summary
         run: |
