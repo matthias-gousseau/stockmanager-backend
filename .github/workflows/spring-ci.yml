@@ -43,7 +43,7 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Run tests
-        run: mvn -B test -X
+        run: mvn -B test -Dspring.profiles.active=ci -X
 
       - name: Upload test results on failure
         if: failure()
