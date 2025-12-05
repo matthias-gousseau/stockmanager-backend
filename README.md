@@ -83,11 +83,8 @@ Modifier `src/main/resources/application.properties` pour :
 
 ## 🔗 Frontend
 
-Frontend Angular disponible ici : [stock-manager-frontend](https://github.com/votre-username/stock-manager-frontend)
+Frontend Angular disponible ici : [stock-manager-frontend](https://github.com/matthias-gousseau/stock-manager-frontend)
 
 ## 👨‍💻 Auteur
 
 **Matthias Gousseau**
-- GitHub: [@matthias-gousseau](https://github.com/matthias-gousseau)
-- LinkedIn: [Votre profil](https://linkedin.com/in/...)
-- Portfolio: [matthias-gousseau.vercel.app](https://matthias-gousseau.vercel.app)
