@@ -1,14 +1,15 @@
 name: Spring Boot CI/CD
 
 on:
+  push:
+    branches: ["dev", "main"]
   pull_request:
-    branches: ["main"]
+    branches: ["dev", "main"]
 
 jobs:
-  # --- Tests Maven ---
+  # Job de tests - s'exécute sur les PR ET les push
   test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,13 +29,15 @@ jobs:
       - name: Run tests
         run: mvn -B test
 
-  # --- Build + Docker + Deploy ---
+  # Job de build et déploiement - s'exécute UNIQUEMENT sur push (après merge)
   build-and-deploy:
     runs-on: ubuntu-latest
     needs: test
-
+    if: github.event_name == 'push'
     env:
-      DOCKER_TAG: latest
+      DOCKER_TAG: ${{ github.ref == 'refs/heads/main' && 'latest' || 'dev' }}
+      SPRING_PROFILE: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+      ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 
     steps:
       - name: Checkout repository
@@ -55,13 +58,13 @@ jobs:
       - name: Build Spring Boot fat-jar
         run: mvn -B clean package -DskipTests
 
-      - name: Login to GHCR
+      - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build Docker image
         run: |
           docker build \
-            -t ghcr.io/matthias-gousseau/stockmanager-backend:latest \
+            -t ghcr.io/matthias-gousseau/stockmanager-backend:${{ env.DOCKER_TAG }} \
             -t ghcr.io/matthias-gousseau/stockmanager-backend:${{ github.sha }} \
             .
 
@@ -70,6 +73,7 @@ jobs:
           docker push ghcr.io/matthias-gousseau/stockmanager-backend:${{ env.DOCKER_TAG }}
           docker push ghcr.io/matthias-gousseau/stockmanager-backend:${{ github.sha }}
 
+      # Déploiement selon la branche
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v0.1.6
         with:
@@ -78,12 +82,15 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd stockmanager
-            echo "🚀 Déploiement backend Spring Boot (latest)"
-            docker compose pull
-            docker compose -f up -d --no-deps
+            COMPOSE_FILE="${{ github.ref == 'refs/heads/main' && 'docker-compose.prod.yml' || 'docker-compose.dev.yml' }}"
+            SERVICE="${{ github.ref == 'refs/heads/main' && 'backend-prod' || 'backend-dev' }}"
+            echo "🚀 Déploiement backend sur ${{ env.ENVIRONMENT }} avec $COMPOSE_FILE - $(date)"
+            docker compose -f $COMPOSE_FILE pull $SERVICE
+            docker compose -f $COMPOSE_FILE up -d --no-deps $SERVICE
             echo "✅ Déploiement terminé"
             docker ps --filter "name=stockmanager" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
+      # Vérification du déploiement
       - name: Verify deployment
         uses: appleboy/ssh-action@v0.1.6
         with:
@@ -92,25 +99,37 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd stockmanager
+            COMPOSE_FILE="${{ github.ref == 'refs/heads/main' && 'docker-compose.prod.yml' || 'docker-compose.dev.yml' }}"
+            SERVICE="${{ github.ref == 'refs/heads/main' && 'backend-prod' || 'backend-dev' }}"
+            # Attendre que le conteneur soit complètement démarré
             sleep 10
-            if ! docker compose ps | grep -q "stockmanager-backend.*Up"; then
-              echo "❌ Le backend ne fonctionne pas"
-              docker compose logs --tail=50 stockmanager-backend
+
+            # Vérifier que le conteneur tourne
+            if ! docker compose -f $COMPOSE_FILE ps $SERVICE | grep -q "Up"; then
+              echo "❌ ERREUR: Le conteneur $SERVICE n'est pas en cours d'exécution"
+              docker compose -f $COMPOSE_FILE logs --tail=50 $SERVICE
               exit 1
             fi
-            echo "✅ Backend Stockmanager opérationnel"
-            docker compose ps
 
+            echo "✅ Backend $SERVICE en cours d'exécution"
+            docker compose -f $COMPOSE_FILE ps
+
+      # Notification de succès
       - name: Deployment summary
         run: |
-          echo "### 🚀 Backend Spring Boot déployé" >> $GITHUB_STEP_SUMMARY
-          echo "- Docker image : ghcr.io/matthias-gousseau/stockmanager-backend:latest" >> $GITHUB_STEP_SUMMARY
-          echo "- Branche : ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Commit : ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Timestamp : $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "### 🚀 Déploiement backend réussi" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environnement**: ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branche**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Docker**: ghcr.io/matthias-gousseau/stockmanager-backend:${{ env.DOCKER_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
 
+      # En cas d'échec du déploiement
       - name: Deployment failed
         if: failure()
         run: |
-          echo "### ❌ Déploiement échoué" >> $GITHUB_STEP_SUMMARY
-          echo "Consultez les logs pour diagnostiquer le problème" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Échec du déploiement backend" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Le déploiement sur ${{ env.ENVIRONMENT }} a échoué." >> $GITHUB_STEP_SUMMARY
+          echo "Consultez les logs pour plus de détails." >> $GITHUB_STEP_SUMMARY
