@@ -128,8 +128,8 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd stockmanager
-            echo "⏳ Attente du démarrage du conteneur (15 secondes)..."
-            sleep 15
+            echo "⏳ Attente du démarrage du conteneur (10 secondes)..."
+            sleep 10
 
             echo "📋 Statut actuel:"
             docker compose -f docker-compose.prod.yml ps
