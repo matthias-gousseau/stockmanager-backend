@@ -59,6 +59,7 @@ jobs:
     if: github.event_name == 'push'
     env:
       DOCKER_TAG: ${{ github.ref == 'refs/heads/main' && 'latest' || 'dev' }}
+      DOCKERFILE: ${{ github.ref == 'refs/heads/main' && 'Dockerfile.prod' || 'Dockerfile.dev' }}
       ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 
     steps:
@@ -86,6 +87,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
+            -f ${{ env.DOCKERFILE }} \
             -t ghcr.io/matthias-gousseau/stockmanager-backend:${{ env.DOCKER_TAG }} \
             -t ghcr.io/matthias-gousseau/stockmanager-backend:${{ github.sha }} \
             .
