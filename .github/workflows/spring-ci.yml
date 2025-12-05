@@ -55,15 +55,20 @@ jobs:
       - name: Build Spring Boot fat-jar
         run: mvn -B clean package -DskipTests
 
-      - name: Log in to GitHub Container Registry
+      - name: Login to GHCR
         run: echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/matthias-gousseau/stockmanager-backend:${{ env.DOCKER_TAG }} .
+          docker build \
+            -t ghcr.io/matthias-gousseau/stockmanager-backend:latest \
+            -t ghcr.io/matthias-gousseau/stockmanager-backend:${{ github.sha }} \
+            .
 
       - name: Push Docker image
-        run: docker push ghcr.io/matthias-gousseau/stockmanager-backend:${{ env.DOCKER_TAG }}
+        run: |
+          docker push ghcr.io/matthias-gousseau/stockmanager-backend:${{ env.DOCKER_TAG }}
+          docker push ghcr.io/matthias-gousseau/stockmanager-backend:${{ github.sha }}
 
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v0.1.6
@@ -74,9 +79,10 @@ jobs:
           script: |
             cd stockmanager
             echo "🚀 Déploiement backend Spring Boot (latest)"
-            docker compose pull backend
-            docker compose up -d backend
-            docker ps --filter "name=backend" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            docker compose pull
+            docker compose -f up -d --no-deps
+            echo "✅ Déploiement terminé"
+            docker ps --filter "name=stockmanager" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
       - name: Verify deployment
         uses: appleboy/ssh-action@v0.1.6
@@ -87,12 +93,12 @@ jobs:
           script: |
             cd stockmanager
             sleep 10
-            if ! docker compose ps | grep -q "backend.*Up"; then
+            if ! docker compose ps | grep -q "stockmanager-backend.*Up"; then
               echo "❌ Le backend ne fonctionne pas"
-              docker compose logs --tail=50 backend
+              docker compose logs --tail=50 stockmanager-backend
               exit 1
             fi
-            echo "✅ Backend opérationnel"
+            echo "✅ Backend Stockmanager opérationnel"
             docker compose ps
 
       - name: Deployment summary
