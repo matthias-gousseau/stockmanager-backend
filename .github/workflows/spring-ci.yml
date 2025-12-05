@@ -87,6 +87,7 @@ jobs:
       - name: Build Docker image
         run: |
           docker build \
+            -f ${{ env.DOCKERFILE }} \
             -t ghcr.io/matthias-gousseau/stockmanager-backend:${{ env.DOCKER_TAG }} \
             -t ghcr.io/matthias-gousseau/stockmanager-backend:${{ github.sha }} \
             .
