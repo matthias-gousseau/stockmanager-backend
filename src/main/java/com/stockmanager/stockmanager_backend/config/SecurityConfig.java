@@ -44,7 +44,7 @@ public class SecurityConfig {
     return new BCryptPasswordEncoder();
   }
 
-  // Configuration CORS pour Angular
+  // Configuration CORS pour Angular 
   // @Bean
   // public WebMvcConfigurer corsConfigurer() {
   // return new WebMvcConfigurer() {
