@@ -36,8 +36,17 @@ public class DataSeeder {
         p2.setMinStock(3);
         p2.setDescription("Souris haute précision");
 
+        Product p3 = new Product();
+        p3.setName("Souris gamer X360z");
+        p3.setCategory("Informatique");
+        p3.setQuantity(32);
+        p3.setPrice(59.99);
+        p3.setMinStock(3);
+        p3.setDescription("Souris haute précision ergonomique");
+
         productRepository.save(p1);
         productRepository.save(p2);
+        productRepository.save(p3);
 
         System.out.println("📦 Seed produits insérés !");
       }
