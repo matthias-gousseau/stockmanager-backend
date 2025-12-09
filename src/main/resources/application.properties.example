@@ -1,0 +1,24 @@
+spring.application.name=stockmanager-backend
+#spring.profiles.active=local
+
+# Configuration du serveur
+server.port=8080
+
+# Configuration de la base de données PostgreSQL
+spring.datasource.url=jdbc:postgresql://localhost:5433/stockmanager_db
+spring.datasource.username=postgres
+spring.datasource.password=postgres
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# JWT Configuration
+jwt.secret=your_jwt_secret
+jwt.expiration=86400000
+
+# CORS
+allowed.origins=${ALLOWED_ORIGINS:http://localhost:4200}
+
+# Logs
+logging.level.org.springframework.security=WARN
+logging.level.com.stockmanager=INFO
