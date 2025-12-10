@@ -9,6 +9,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import com.stockmanager.stockmanager_backend.security.JwtAuthenticationFilter;
 
@@ -44,19 +46,19 @@ public class SecurityConfig {
     return new BCryptPasswordEncoder();
   }
 
-  // Configuration CORS pour Angular 
-  // @Bean
-  // public WebMvcConfigurer corsConfigurer() {
-  // return new WebMvcConfigurer() {
-  // @Override
-  // public void addCorsMappings(CorsRegistry registry) {
-  // registry.addMapping("/**")
-  // .allowedOriginPatterns("http://localhost:4200") // Angular dev
-  // .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-  // .allowedHeaders("*")
-  // .allowCredentials(true);
-  // }
-  // };
-  // }
+  // Configuration CORS pour Angular
+  @Bean
+  public WebMvcConfigurer corsConfigurer() {
+    return new WebMvcConfigurer() {
+      @Override
+      public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+            .allowedOriginPatterns("https://stockmanager.matthiasgousseau.fr", "http://51.91.110.222:4200")
+            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .allowedHeaders("*")
+            .allowCredentials(true);
+      }
+    };
+  }
 
 }
